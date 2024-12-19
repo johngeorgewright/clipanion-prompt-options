@@ -1,0 +1,47 @@
+name: Publish
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  cache:
+    uses: ./.github/workflows/cache.yml
+
+  publish-npm:
+    name: NPM
+    needs: [cache]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Setup Registries
+        run: |
+          yarn config set --home 'npmRegistries["https://registry.npmjs.org"].npmAuthToken' '${{ secrets.NPM_TOKEN }}'
+          yarn config set --home npmPublishRegistry https://registry.npmjs.org
+
+      - name: Restore cache
+        uses: actions/cache@v4
+        with:
+          key: ${{ needs.cache.outputs.yarn-cache-key }}
+          path: ${{ needs.cache.outputs.yarn-cache-path }}
+
+      - name: Build
+        run: yarn build
+
+      - name: Test
+        run: yarn test
+
+      - name: Release
+        run: yarn semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
